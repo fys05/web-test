@@ -2,7 +2,7 @@ def secret_name = "registry-auth-secret"
 def k8s_auth = "kubeconfig"
 podTemplate(
     cloud: "kubernetes",
-    namespace: "jenkins",
+    namespace: "devops",
     label: 'jenkins-slave',
     // 配置容器信息
     containers: [
@@ -18,7 +18,8 @@ podTemplate(
         )
     ],
     volumes:[
-        hostPathVolume(mountPath:'/var/run/docker.sock',hostPath:'/run/docker.sock')
+        hostPathVolume(mountPath:'/var/run/docker.sock',hostPath:'/run/docker.sock'),
+        hostPathVolume(mountPath:'/usr/bin/kubectl',hostPath:'/usr/bin/kubectl')
     ]
 ){
     node('jenkins-slave'){
@@ -26,11 +27,12 @@ podTemplate(
             echo "test"
         }
         stage('代码拉取') {
-            git credentialsId: 'cd4dfa5f-49d6-4908-a344-fe418d28dcbd', url: 'http://192.168.40.210:31323/fff/web-test.git'
+           // git credentialsId: 'cd4dfa5f-49d6-4908-a344-fe418d28dcbd', url: 'http://192.168.40.210:31323/fff/web-test.git'
+           git credentialsId: 'gitlab', url: 'http://192.168.40.210:32456/root/web-test.git'
         }
         stage('构建镜像上传dockerhub'){
             container('docker'){
-                def harbor_auth="d9660d46-a9db-4b61-ba9b-1f77a6e23d6a"
+                def harbor_auth="dockerhub"
                 sh "pwd && docker build -t nginx:v1 . && docker tag nginx:v1 fuyongsheng/k8s-repo:nginx-test"
                 //第一种推送镜像方式,主要是登陆方式不同
                 //sh "echo fys051813 | docker login -u fuyongsheng --password-stdin"
@@ -49,6 +51,12 @@ podTemplate(
         sh """sed -i 's#\$IMAGE_NAME#${image_name}#' nginx.yml 
               sed -i 's#\$SECRET_NAME#${secret_name}#' nginx.yml
         """
-        kubernetesDeploy configs: "nginx.yml",kubeconfigId: "${k8s_auth}"
+        kubeconfig(credentialsId: 'kubeconfig', serverUrl: '') {
+         // some block
+         sh """ kubectl apply -f nginx.yml --record
+                kubectl rollout restart -f nginx.yml
+         """
+        }
+        //kubernetesDeploy configs: "nginx.yml",kubeconfigId: "${k8s_auth}" //新版jenkins取消了Kubernetes Continuous Deploy插件，该插件有漏洞
     }
 }
