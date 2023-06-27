@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: nginx-test
-  namespace: jenkins
+  namespace: devops
 spec:
   serviceName: "nginx-test"
   replicas: 2
